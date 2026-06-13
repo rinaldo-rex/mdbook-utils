@@ -1,0 +1,6 @@
+# Rust
+/target/
+Cargo.lock
+
+# mdBook example build output
+/example/book/

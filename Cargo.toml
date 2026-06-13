@@ -1,0 +1,17 @@
+[package]
+name = "mdbook-utils"
+version = "0.1.0"
+edition = "2021"
+description = "Utility preprocessors for mdBook"
+license = "MIT"
+
+[[bin]]
+name = "mdbook-utils"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+mdbook-preprocessor = "0.5"
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+regex = "1"
+serde_json = "1"
