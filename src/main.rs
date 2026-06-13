@@ -1,3 +1,12 @@
+// Architecture Decision Records: see adr.md at the repo root.
+// Key conventions:
+//   - One [preprocessor.util-*] section per utility (ADR-001).
+//   - No name-prefix on keys inside a utility section (ADR-002).
+//   - All utilities share this single binary (ADR-003).
+//   - Global banner injection (ADR-004).
+//   - Theme-aware CSS via mdBook variables (ADR-005).
+//   - localStorage + date-stamp dismiss pattern (ADR-006).
+
 use clap::{Arg, Command};
 use mdbook_preprocessor::{
     book::{Book, BookItem},
@@ -132,6 +141,7 @@ struct UtilsPreprocessor {
     banner: Option<BannerConfig>,
 }
 
+// Keys are plain (no prefix) — scoped by [preprocessor.util-banner]  (ADR-001, ADR-002)
 struct BannerConfig {
     position: String, // "top" or "bottom"
     sticky: bool,
