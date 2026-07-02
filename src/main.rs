@@ -90,7 +90,7 @@ static BANNER_RE: LazyLock<Regex> = LazyLock::new(|| {
 // ── CLI ───────────────────────────────────────────────────────────────
 
 fn make_app() -> Command {
-    Command::new("mdbook-utils")
+    Command::new("mdutils")
         .about(concat!(
             "Utility preprocessors for mdBook.\n",
             "Detected preprocessors are dispatched automatically."
@@ -231,7 +231,7 @@ impl UtilsPreprocessor {
 
 impl Preprocessor for UtilsPreprocessor {
     fn name(&self) -> &str {
-        "mdbook-utils"
+        "mdutils"
     }
 
     fn run(&self, _ctx: &PreprocessorContext, mut book: Book) -> Result<Book, Error> {

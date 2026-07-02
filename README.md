@@ -1,4 +1,4 @@
-# mdbook-utils
+# mdutils
 
 Utility preprocessors for [mdBook](https://rust-lang.github.io/mdBook/).
 
@@ -43,7 +43,7 @@ Preview build — not for production.
 ## Installation
 
 ```bash
-cargo install mdbook-utils
+cargo install mdutils
 ```
 
 ---
@@ -54,7 +54,7 @@ Add the preprocessor to your `book.toml`:
 
 ```toml
 [preprocessor.util-banner]
-command = "mdbook-utils"
+command = "mdutils"
 
 # ── Optional settings ────────────────
 position = "top"     # "top" (default) or "bottom"
@@ -77,7 +77,7 @@ All options live under `[preprocessor.util-banner]`:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `command` | string | — | **Required.** Set to `"mdbook-utils"`. |
+| `command` | string | — | **Required.** Set to `"mdutils"`. |
 | `position` | string | `"top"` | Where the banner appears: `"top"` or `"bottom"`. |
 | `sticky` | bool | `false` | If `true`, the close button is hidden and the banner cannot be dismissed. |
 

@@ -1,11 +1,11 @@
 [book]
-title = "mdbook-utils Example"
-authors = ["mdbook-utils contributors"]
+title = "mdutils Example"
+authors = ["mdutils contributors"]
 
 [build]
 build-dir = "book"
 
 [preprocessor.util-banner]
-command = "mdbook-utils"
-position = "right"
-sticky = true
+command = "mdutils"
+position = "top"
+sticky = false

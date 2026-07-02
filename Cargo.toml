@@ -1,12 +1,12 @@
 [package]
-name = "mdbook-utils"
-version = "0.1.0"
+name = "mdutils"
+version = "0.1.1"
 edition = "2021"
 description = "Utility preprocessors for mdBook"
 license = "MIT"
 
 [[bin]]
-name = "mdbook-utils"
+name = "mdutils"
 path = "src/main.rs"
 
 [dependencies]
