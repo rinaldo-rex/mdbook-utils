@@ -218,10 +218,13 @@ impl UtilsPreprocessor {
                 // Inject banner HTML into this chapter.
                 match cfg.position.as_str() {
                     "bottom" => {
-                        chap.content.push_str(&format!("\n{header}\n{banners_html}"));
+                        chap.content.push_str(&format!("\n\n{header}\n{banners_html}"));
                     }
                     _ => {
-                        chap.content = format!("{header}\n{banners_html}\n{}", chap.content);
+                        // Blank line required between HTML block and markdown,
+                        // otherwise pulldown-cmark treats the heading text as
+                        // part of the raw HTML block.
+                        chap.content = format!("{header}\n{banners_html}\n\n{}", chap.content);
                     }
                 }
             }

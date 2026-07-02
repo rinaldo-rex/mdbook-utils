@@ -5,10 +5,9 @@
 - Dismiss it with the `×` button — it'll stay hidden until tomorrow
 - Try switching themes in the top-right menu to see theme-aware colours
 {{/util-banner}}
+### Introduction
 
-# Introduction
-
-Welcome to the **mdbook-utils** example book.
+Welcome to the **mdutils** example book.
 
 This page defines a banner block above. After the preprocessor runs, that
 block is removed from this chapter's source and the rendered HTML banner is
