@@ -141,3 +141,37 @@ key (`YYYY-MM-DD`) so they reappear on the next calendar day.  The pattern:
 
 This works without a server, keeps per-browser state, and requires zero
 additional dependencies.
+
+---
+
+## ADR-007: Hide-from-sidebar-but-keep-building via runtime JS
+
+**Date**: 2026-07-02
+**Status**: Accepted
+
+mdBook's `Book` model drives both HTML emission *and* the sidebar TOC from
+the same structure, and mdBook has **no native “hide from nav” flag**.  A
+preprocessor therefore cannot separate “render” from “list” by editing the
+book: removing a chapter from `book.sections` drops its HTML too.
+
+`util-private-page` solves this by *keeping* the private chapter in the book
+(so it still builds) and hiding it **at runtime in the browser**.  A marker
+(`<!--util-private-page-->`) flags a chapter as private;
+the preprocessor strips the marker, records the chapter’s output href, and
+injects a small script into **every** chapter.  On `DOMContentLoaded` (after
+mdBook’s `toc.js` has populated the sidebar WebComponent) the script:
+
+1. Removes the sidebar `<li>` whose `<a href>` points at a private page; and
+2. Rewrites the prev/next links to skip over private pages.
+
+*Identification*: the script uses mdBook’s global `path_to_root` to resolve
+each baked-in relative href (e.g. `sub/secret.html`) to the same absolute
+URL mdBook’s `toc.js` computes for the sidebar links, so matching is robust
+regardless of hosting depth.  The ordered list is reproduced in Rust from
+`book.iter()` (pre-order of non-draft chapters), mirroring `book.chapters()`
+which the renderer uses for both output files and prev/next ordering.
+
+*Scope*: this is **unlisting / decluttering**, not security.  The page is
+fully reachable by its URL, and by search index / `print.html` unless the
+user opts into further stripping (out of scope).  Sidebar numbering may show
+gaps (numbers are baked into `toc.js`).

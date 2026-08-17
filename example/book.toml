@@ -9,3 +9,8 @@ build-dir = "book"
 command = "mdutils"
 position = "top"
 sticky = false
+
+[preprocessor.util-private-page]
+command = "mdutils"
+hide_sidebar = true
+hide_nav_buttons = true
