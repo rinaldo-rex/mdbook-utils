@@ -95,6 +95,17 @@ static PRIVATE_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?m)^[ \t]*<!--[ \t]*util-private-page[ \t]*-->[ \t]*(?:\r?\n)?").unwrap()
 });
 
+// A regex to find relative links in rendered banner HTML.
+// Matches <a href="./foo.html"> but NOT absolute URLs, root-relative paths,
+// anchors, or parent-relative links (../).
+//
+// The banner content always uses `./` for same-directory links (e.g.
+// `./my_journey_into_ai.html`). By stripping the `./` prefix, the link
+// becomes root-relative (e.g. `my_journey_into_ai.html`), which resolves
+// correctly from any chapter in the book.
+static BANNER_LINK_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"(<a\s[^>]*href=")\.\/([^"]+)"#).unwrap());
+
 // ── CLI ───────────────────────────────────────────────────────────────
 
 fn make_app() -> Command {
@@ -260,13 +271,19 @@ impl UtilsPreprocessor {
             None => return,
         };
 
-        // ── Pass 1: collect banner contents from all chapters ──────
-        let mut banners: Vec<String> = Vec::new();
+        // ── Pass 1: collect banner contents and source paths ──────
+        //
+        // Each banner's relative links (e.g. `./foo.html`) are written
+        // relative to the chapter where the banner was defined. We track
+        // the source chapter's path so we can adjust links later.
+        let mut banners: Vec<(String, std::path::PathBuf)> = Vec::new();
         for item in book.iter() {
             if let BookItem::Chapter(chap) = item {
-                for caps in BANNER_RE.captures_iter(&chap.content) {
-                    if let Some(m) = caps.name("content") {
-                        banners.push(m.as_str().to_string());
+                if let Some(chapter_path) = &chap.path {
+                    for caps in BANNER_RE.captures_iter(&chap.content) {
+                        if let Some(m) = caps.name("content") {
+                            banners.push((m.as_str().to_string(), chapter_path.clone()));
+                        }
                     }
                 }
             }
@@ -280,7 +297,7 @@ impl UtilsPreprocessor {
         let banner_html_blocks: Vec<String> = banners
             .iter()
             .enumerate()
-            .map(|(i, content)| build_banner(content, i, cfg.sticky))
+            .map(|(i, (content, _))| build_banner(content, i, cfg.sticky))
             .collect();
         let banners_html = banner_html_blocks.join("\n");
 
@@ -291,21 +308,39 @@ impl UtilsPreprocessor {
         };
 
         // ── Pass 2: mutate every chapter ───────────────────────────
+        //
+        // Banner content is extracted once and injected into every chapter.
+        // Relative links in the banner (e.g. `./foo.html`) are written
+        // relative to the chapter where the banner markdown was defined.
+        // When the banner appears in a different chapter at a different
+        // directory depth, those links break (404).
+        //
+        // Fix: compute the relative path from the source chapter's
+        // directory to the book root, then prepend that to each link.
+        // For example, if the banner is defined in `2026/foreword.md`
+        // and has a link `./foo.html`, the adjusted link becomes
+        // `2026/foo.html` (root-relative), which works from any chapter.
         book.for_each_mut(|item| {
             if let BookItem::Chapter(chap) = item {
                 // Remove banner markers from this chapter.
                 chap.content = BANNER_RE.replace_all(&chap.content, "").to_string();
 
+                // Adjust relative links in banner HTML to be root-relative.
+                let source_path = banners.first().map(|(_, p)| p.clone());
+                let adjusted_banners = adjust_banner_links(&banners_html, source_path.as_ref(), &chap.path);
+
                 // Inject banner HTML into this chapter.
                 match cfg.position.as_str() {
                     "bottom" => {
-                        chap.content.push_str(&format!("\n\n{header}\n{banners_html}"));
+                        chap.content
+                            .push_str(&format!("\n\n{header}\n{adjusted_banners}"));
                     }
                     _ => {
                         // Blank line required between HTML block and markdown,
                         // otherwise pulldown-cmark treats the heading text as
                         // part of the raw HTML block.
-                        chap.content = format!("{header}\n{banners_html}\n\n{}", chap.content);
+                        chap.content =
+                            format!("{header}\n{adjusted_banners}\n\n{}", chap.content);
                     }
                 }
             }
@@ -355,6 +390,61 @@ fn build_banner(md_content: &str, id: usize, sticky: bool) -> String {
   {close_btn}
 </div>"#
     )
+}
+
+// ── Banner link adjuster ────────────────────────────────────────────
+//
+// Banner content is extracted once from the source markdown and rendered
+// to HTML. The relative links (e.g. `./foo.html`) are written relative to
+// the chapter where the banner was defined (the "source chapter"). When
+// the same banner is injected into chapters at different directory depths,
+// those links break (404).
+//
+// Solution: compute the relative path from the target chapter's directory
+// to the source chapter's directory, then prepend that to each link. For
+// example, if the source is `2026/foreword.html` with a link `./foo.html`,
+// and the target is `archives/professional/coding/ch.html`, the adjusted
+// link becomes `../../2026/foo.html`.
+fn adjust_banner_links(
+    html: &str,
+    source_path: Option<&std::path::PathBuf>,
+    chapter_path: &Option<std::path::PathBuf>,
+) -> String {
+    // Banner content uses `./` for same-directory links (e.g.
+    // `./my_journey_into_ai.html`). These links are only correct when
+    // viewed from the chapter where the banner was defined (the "source
+    // chapter"). When the banner is injected into other chapters at
+    // different directory depths, those links break (404).
+    //
+    // Fix: compute the relative path from the target chapter's directory
+    // to the source chapter's directory, then prepend that to the link.
+    // For example, if the source is `2026/foreword.html` with link
+    // `./foo.html`, and the target is `archives/professional/coding/ch.html`,
+    // the adjusted link becomes `../../2026/foo.html`.
+    let (source_dir, chapter_dir) = match (source_path, chapter_path) {
+        (Some(sp), Some(cp)) => {
+            let sd = sp.parent().unwrap_or(std::path::Path::new(""));
+            let cd = cp.parent().unwrap_or(std::path::Path::new(""));
+            (sd, cd)
+        }
+        _ => return html.to_string(),
+    };
+
+    // If both are in the same directory, no adjustment needed.
+    if source_dir == chapter_dir {
+        return html.to_string();
+    }
+
+    // Compute relative path from chapter_dir to source_dir.
+    let relative_prefix = pathdiff::diff_paths(source_dir, chapter_dir)
+        .map(|p| format!("{}/", p.to_string_lossy()))
+        .unwrap_or_default();
+
+    BANNER_LINK_RE
+        .replace_all(html, |caps: &regex::Captures| {
+            format!("{}{}{}", &caps[1], relative_prefix, &caps[2])
+        })
+        .to_string()
 }
 
 // ── Private-page script builder ────────────────────────────────────────
