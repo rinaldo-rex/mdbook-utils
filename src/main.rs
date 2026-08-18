@@ -414,12 +414,12 @@ fn adjust_banner_links(
     // Get the source chapter's directory (e.g. "2026" from "2026/foreword.md").
     let source_dir = match source_path.and_then(|p| p.parent()) {
         Some(dir) if !dir.as_os_str().is_empty() => {
-            format!("{}/", dir.to_string_lossy())
+            format!("/{}/", dir.to_string_lossy())
         }
         _ => return html.to_string(),
     };
 
-    // Rewrite `./foo.html` → `2026/foo.html` (root-relative).
+    // Rewrite `./foo.html` → `/2026/foo.html` (absolute from server root).
     BANNER_LINK_RE
         .replace_all(html, |caps: &regex::Captures| {
             format!("{}{}{}", &caps[1], source_dir, &caps[2])
