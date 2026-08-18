@@ -398,51 +398,31 @@ fn build_banner(md_content: &str, id: usize, sticky: bool) -> String {
 // to HTML. The relative links (e.g. `./foo.html`) are written relative to
 // the chapter where the banner was defined (the "source chapter"). When
 // the same banner is injected into chapters at different directory depths,
-// those links break (404).
+// those links break (404). Additionally, mdBook copies the first chapter
+// to `index.html` at the book root — relative links like `./foo.html`
+// resolve from the root, not from the chapter's directory.
 //
-// Solution: compute the relative path from the target chapter's directory
-// to the source chapter's directory, then prepend that to each link. For
-// example, if the source is `2026/foreword.html` with a link `./foo.html`,
-// and the target is `archives/professional/coding/ch.html`, the adjusted
-// link becomes `../../2026/foo.html`.
+// Solution: strip the `./` prefix and prepend the source chapter's
+// directory, making links root-relative (e.g. `2026/foo.html`). These
+// resolve correctly from ANY page — the chapter itself, the root
+// `index.html`, or any other depth in the book.
 fn adjust_banner_links(
     html: &str,
     source_path: Option<&std::path::PathBuf>,
-    chapter_path: &Option<std::path::PathBuf>,
+    _chapter_path: &Option<std::path::PathBuf>,
 ) -> String {
-    // Banner content uses `./` for same-directory links (e.g.
-    // `./my_journey_into_ai.html`). These links are only correct when
-    // viewed from the chapter where the banner was defined (the "source
-    // chapter"). When the banner is injected into other chapters at
-    // different directory depths, those links break (404).
-    //
-    // Fix: compute the relative path from the target chapter's directory
-    // to the source chapter's directory, then prepend that to the link.
-    // For example, if the source is `2026/foreword.html` with link
-    // `./foo.html`, and the target is `archives/professional/coding/ch.html`,
-    // the adjusted link becomes `../../2026/foo.html`.
-    let (source_dir, chapter_dir) = match (source_path, chapter_path) {
-        (Some(sp), Some(cp)) => {
-            let sd = sp.parent().unwrap_or(std::path::Path::new(""));
-            let cd = cp.parent().unwrap_or(std::path::Path::new(""));
-            (sd, cd)
+    // Get the source chapter's directory (e.g. "2026" from "2026/foreword.md").
+    let source_dir = match source_path.and_then(|p| p.parent()) {
+        Some(dir) if !dir.as_os_str().is_empty() => {
+            format!("{}/", dir.to_string_lossy())
         }
         _ => return html.to_string(),
     };
 
-    // If both are in the same directory, no adjustment needed.
-    if source_dir == chapter_dir {
-        return html.to_string();
-    }
-
-    // Compute relative path from chapter_dir to source_dir.
-    let relative_prefix = pathdiff::diff_paths(source_dir, chapter_dir)
-        .map(|p| format!("{}/", p.to_string_lossy()))
-        .unwrap_or_default();
-
+    // Rewrite `./foo.html` → `2026/foo.html` (root-relative).
     BANNER_LINK_RE
         .replace_all(html, |caps: &regex::Captures| {
-            format!("{}{}{}", &caps[1], relative_prefix, &caps[2])
+            format!("{}{}{}", &caps[1], source_dir, &caps[2])
         })
         .to_string()
 }
